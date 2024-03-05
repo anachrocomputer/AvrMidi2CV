@@ -2,7 +2,7 @@
 
 Simple MIDI to Control Voltage (CV) converter.
 Very much a work-in-progress at the moment,
-with no MIDI state machine and just a trace print of MIDI bytes.
+with a basic MIDI state machine and just a trace print of MIDI messages.
 SPI interface to MCP4822 DAC is not implemented yet.
 
 Runs on ATmega4809. Code in C, compiled with GCC.
@@ -16,16 +16,14 @@ Runs on ATmega4809. Code in C, compiled with GCC.
 | MIDI_IN  | RxD1     | 2 (PC1)               |                   |
 | SQWAVE   | PC2      | 3                     |                   |
 | LED      | PC3      | 4                     |                   |
+| GATE     | PC4      | 7                     |                   |
+| TRIGGER  | PC5      | 8                     |                   |
 | MOSI     | PA4/MOSI | 37                    | 4 (SDI)           |
 | MISO     | PA5/MISO | 38                    | n/c               |
 | SCK      | PA6/SCK  | 39                    | 3 (SCK)           |
 | SS       | PA7/SS   | 40                    | 2 (/CS)           |
 | RxD      | RxD0     | 34 (PA1)              |                   |
 | TxD      | TxD0     | 33 (PA0)              |                   |
-| TRIGGER  | ?        | ?                     |                   |
-| GATE     | ?        | ?                     |                   |
-
-TRIGGER and GATE outputs TBD.
 
 Power and ground pins not shown.
 

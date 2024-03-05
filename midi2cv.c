@@ -10,10 +10,6 @@
 // UART0 RxD on PA1 (default) pin 34
 // UART1 TxD on PC0 (default) pin 1
 // UART1 RxD on PC1 (default) pin 2
-// UART2 TxD on PF0 (default)
-// UART2 RxD on PF1 (default)
-// UART3 TxD on PB0 (default)
-// UART3 RxD on PB1 (default)
 #define SQWAVE_PIN  PIN2_bm   // 500Hz square wave on PC2 (pin 3)
 #define LED_PIN     PIN3_bm   // Blinking LED on PC3 (pin 4)
 #define GATE_PIN    PIN4_bm   // GATE signal on PC4 (pin 7)
@@ -176,7 +172,7 @@ ISR(TCB0_INT_vect)
    TCB0.INTFLAGS = TCB_CAPT_bm;
    Milliseconds++;
    Tick = 1;
-   PORTC.OUTTGL = SQWAVE_PIN;     // DEBUG: 500Hz on PC4 pin
+   PORTC.OUTTGL = SQWAVE_PIN;     // DEBUG: 500Hz on PC2 pin
 }
 
 
