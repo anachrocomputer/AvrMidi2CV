@@ -56,8 +56,6 @@ struct UART_BUFFER
 // UART buffers
 struct UART_BUFFER U0Buf;
 struct UART_BUFFER U1Buf;
-struct UART_BUFFER U2Buf;
-struct UART_BUFFER U3Buf;
 
 uint8_t SavedRSTFR = 0;
 volatile uint32_t Milliseconds = 0UL;
@@ -136,82 +134,6 @@ ISR(USART1_DRE_vect)
    else
    {
       USART1.CTRLA &= ~(USART_DREIE_bm); // Nothing left to send; disable Tx interrupt
-   }
-}
-
-
-/* USART2_RXC_vect --- ISR for USART2 Receive Complete, used for Rx */
-
-ISR(USART2_RXC_vect)
-{
-   const uint8_t tmphead = (U2Buf.rx.head + 1) & UART_RX_BUFFER_MASK;
-   const uint8_t ch = USART2.RXDATAL;  // Read received byte from UART
-   
-   if (tmphead == U2Buf.rx.tail)   // Is receive buffer full?
-   {
-       // Buffer is full; discard new byte
-   }
-   else
-   {
-      U2Buf.rx.head = tmphead;
-      U2Buf.rx.buf[tmphead] = ch;   // Store byte in buffer
-   }
-}
-
-
-/* USART2_DRE_vect --- ISR for USART2 Data Register Empty, used for Tx */
-
-ISR(USART2_DRE_vect)
-{
-   if (U2Buf.tx.head != U2Buf.tx.tail) // Is there anything to send?
-   {
-      const uint8_t tmptail = (U2Buf.tx.tail + 1) & UART_TX_BUFFER_MASK;
-      
-      U2Buf.tx.tail = tmptail;
-
-      USART2.TXDATAL = U2Buf.tx.buf[tmptail];    // Transmit one byte
-   }
-   else
-   {
-      USART2.CTRLA &= ~(USART_DREIE_bm); // Nothing left to send; disable Tx interrupt
-   }
-}
-
-
-/* USART3_RXC_vect --- ISR for USART3 Receive Complete, used for Rx */
-
-ISR(USART3_RXC_vect)
-{
-   const uint8_t tmphead = (U3Buf.rx.head + 1) & UART_RX_BUFFER_MASK;
-   const uint8_t ch = USART3.RXDATAL;  // Read received byte from UART
-   
-   if (tmphead == U3Buf.rx.tail)   // Is receive buffer full?
-   {
-       // Buffer is full; discard new byte
-   }
-   else
-   {
-      U3Buf.rx.head = tmphead;
-      U3Buf.rx.buf[tmphead] = ch;   // Store byte in buffer
-   }
-}
-
-
-/* USART3_DRE_vect --- ISR for USART3 Data Register Empty, used for Tx */
-
-ISR(USART3_DRE_vect)
-{
-   if (U3Buf.tx.head != U3Buf.tx.tail) // Is there anything to send?
-   {
-      const uint8_t tmptail = (U3Buf.tx.tail + 1) & UART_TX_BUFFER_MASK;
-      
-      U3Buf.tx.tail = tmptail;
-
-      USART3.TXDATAL = U3Buf.tx.buf[tmptail];    // Transmit one byte
-   }
-   else
-   {
-      USART3.CTRLA &= ~(USART_DREIE_bm); // Nothing left to send; disable Tx interrupt
    }
 }
 
@@ -334,38 +256,6 @@ void UART1TxByte(const uint8_t data)
 }
 
 
-/* UART2TxByte --- send one character to UART2 via the circular buffer */
-
-void UART2TxByte(const uint8_t data)
-{
-   const uint8_t tmphead = (U2Buf.tx.head + 1) & UART_TX_BUFFER_MASK;
-   
-   while (tmphead == U2Buf.tx.tail)   // Wait, if buffer is full
-       ;
-
-   U2Buf.tx.buf[tmphead] = data;
-   U2Buf.tx.head = tmphead;
-
-   USART2.CTRLA |= USART_DREIE_bm;   // Enable UART2 Tx interrupt
-}
-
-
-/* UART3TxByte --- send one character to UART3 via the circular buffer */
-
-void UART3TxByte(const uint8_t data)
-{
-   const uint8_t tmphead = (U3Buf.tx.head + 1) & UART_TX_BUFFER_MASK;
-   
-   while (tmphead == U3Buf.tx.tail)   // Wait, if buffer is full
-       ;
-
-   U3Buf.tx.buf[tmphead] = data;
-   U3Buf.tx.head = tmphead;
-
-   USART3.CTRLA |= USART_DREIE_bm;   // Enable UART3 Tx interrupt
-}
-
-
 /* printDeviceID --- print the Device ID bytes as read from SIGROW */
 
 void printDeviceID(void)
@@ -406,19 +296,6 @@ void printFuses(void)
 void printResetReason(void)
 {
    printf("RSTCTRL.RSTFR = 0x%02x\n", SavedRSTFR);
-}
-
-
-int getTemp(void)
-{
-   int8_t sigrow_offset = SIGROW.TEMPSENSE1;  // Read signed value from signature row
-   uint8_t sigrow_gain = SIGROW.TEMPSENSE0;    // Read unsigned value from signature row
-   
-   uint16_t adc_reading = 0;   // ADC conversion result with 1.1 V internal reference 
-   uint32_t temp = adc_reading - sigrow_offset;temp *= sigrow_gain;  // Result might overflow 16 bit variable (10bit+8bit)
-   temp += 0x80;               // Add 1/2 to get correct rounding on division below
-   temp >>= 8;                 // Divide result to get Kelvin 
-   uint16_t temperature_in_K = temp;
 }
 
 
@@ -507,36 +384,6 @@ static void initUARTs(void)
    
    // Enable UART1 TxD pin
    PORTC.DIRSET = PIN0_bm;
-   
-   // Set up UART2 and associated circular buffers
-   U2Buf.tx.head = 0;
-   U2Buf.tx.tail = 0;
-   U2Buf.rx.head = 0;
-   U2Buf.rx.tail = 0;
-
-   USART2.BAUD = (F_CPU * 64UL) / (16UL * BAUDRATE);
-   USART2.CTRLA = 0;
-   USART2.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc | USART_CHSIZE_8BIT_gc;
-   USART2.CTRLA |= USART_RXCIE_bm;   // Enable UART2 Rx interrupt
-   USART2.CTRLB = USART_RXEN_bm | USART_TXEN_bm | USART_RXMODE_NORMAL_gc;
-   
-   // Enable UART2 TxD pin
-   PORTF.DIRSET = PIN0_bm;
-   
-   // Set up UART3 and associated circular buffers
-   U3Buf.tx.head = 0;
-   U3Buf.tx.tail = 0;
-   U3Buf.rx.head = 0;
-   U3Buf.rx.tail = 0;
-
-   USART3.BAUD = (F_CPU * 64UL) / (16UL * BAUDRATE);
-   USART3.CTRLA = 0;
-   USART3.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc | USART_CHSIZE_8BIT_gc;
-   USART3.CTRLA |= USART_RXCIE_bm;   // Enable UART3 Rx interrupt
-   USART3.CTRLB = USART_RXEN_bm | USART_TXEN_bm | USART_RXMODE_NORMAL_gc;
-   
-   // Enable UART3 TxD pin (inaccessible on DIP-40 version)
-   PORTB.DIRSET = PIN0_bm;
    
    stdout = &USART_stream;    // Allow use of 'printf' and similar functions
 }
