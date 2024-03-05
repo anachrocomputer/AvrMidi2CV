@@ -14,8 +14,37 @@
 // UART2 RxD on PF1 (default)
 // UART3 TxD on PB0 (default)
 // UART3 RxD on PB1 (default)
-#define SQWAVE PIN2_bm  // 500Hz square wave on PC2 (pin 3)
-#define LED    PIN3_bm  // Blinking LED on PC3 (pin 4)
+#define SQWAVE_PIN  PIN2_bm   // 500Hz square wave on PC2 (pin 3)
+#define LED_PIN     PIN3_bm   // Blinking LED on PC3 (pin 4)
+#define GATE_PIN    PIN4_bm   // GATE signal on PC4 (pin 7)
+#define TRIGGER_PIN PIN5_bm   // TRIGGER signal on PC5 (pin 8)
+
+
+#define MIDI_NOTE_OFF           (0x80)
+#define MIDI_NOTE_ON            (0x90)
+#define MIDI_POLY_AFTERTOUCH    (0xA0)
+#define MIDI_CONTROL_CHANGE     (0xB0)
+#define MIDI_PROGRAM_CHANGE     (0xC0)
+#define MIDI_CHAN_AFTERTOUCH    (0xD0)
+#define MIDI_PITCH_BEND         (0xE0)
+#define MIDI_SYSTEM             (0xF0)
+
+#define MIDI_SYS_EX             (0x00)
+#define MIDI_TIME_CODE          (0x01)
+#define MIDI_SONG_POSITION      (0x02)
+#define MIDI_SONG_SELECT        (0x03)
+#define MIDI_RESERVED4          (0x04)
+#define MIDI_RESERVED5          (0x05)
+#define MIDI_TUNE_REQUEST       (0x06)
+#define MIDI_SYS_EX_END         (0x07)
+#define MIDI_TIMING_CLOCK       (0x08)
+#define MIDI_RESERVED9          (0x09)
+#define MIDI_START              (0x0A)
+#define MIDI_CONTINUE           (0x0B)
+#define MIDI_STOP               (0x0C)
+#define MIDI_RESERVED13         (0x0D)
+#define MIDI_ACTIVE_SENSING     (0x0E)
+#define MIDI_SYS_RESET          (0x0F)
 
 
 #define BAUDRATE (9600UL)
@@ -60,6 +89,8 @@ struct UART_BUFFER U1Buf;
 uint8_t SavedRSTFR = 0;
 volatile uint32_t Milliseconds = 0UL;
 volatile uint8_t Tick = 0;
+uint32_t TriggerOff = 0xffffffff;
+const char NoteNames[12][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
 
 /* USART0_RXC_vect --- ISR for USART0 Receive Complete, used for Rx */
@@ -145,7 +176,7 @@ ISR(TCB0_INT_vect)
    TCB0.INTFLAGS = TCB_CAPT_bm;
    Milliseconds++;
    Tick = 1;
-   PORTC.OUTTGL = SQWAVE;     // DEBUG: 500Hz on PC4 pin
+   PORTC.OUTTGL = SQWAVE_PIN;     // DEBUG: 500Hz on PC4 pin
 }
 
 
@@ -256,6 +287,136 @@ void UART1TxByte(const uint8_t data)
 }
 
 
+/* MidiNoteOn --- handle a MIDI note on message */
+
+void MidiNoteOn(const int channel, const int note, const int velocity)
+{   
+   // TODO: set CV and velocity DACs here
+   
+   PORTC.OUTSET = GATE_PIN;      // GATE signal HIGH
+   PORTC.OUTSET = TRIGGER_PIN;   // TRIGGER signal HIGH
+   TriggerOff = millis() + 10;
+   
+   printf("%d NON %d %s%d %d\n", channel, note, NoteNames[note % 12], (note / 12) - 1, velocity);
+}
+
+
+/* MidiNoteOff --- handle a note off message */
+
+void MidiNoteOff(const int channel, const int note, const int velocity)
+{
+   PORTC.OUTCLR = GATE_PIN;      // GATE signal LOW
+   
+   printf("%d NOFF %d %d\n", channel, note, velocity);
+}
+
+
+/* MidiProgramChange --- handle a program change message */
+
+void MidiProgramChange(const int channel, const int program)
+{
+   printf("%d PC %d\n", channel, program);
+}
+
+
+/* MidiControlChange --- handle a control change message */
+
+void MidiControlChange(const int channel, const int control, const int value)
+{
+   // TODO: set control DAC here
+   
+   printf("%d CC %d: %d\n", channel, control, value);
+}
+
+
+/* MidiPitchBend --- handle a pitch bend message */
+
+void MidiPitchBend(const int channel, const int bend)
+{
+   // TODO: set pitch bend DAC here
+   
+   printf("%d PB %d\n", channel, bend);
+}
+
+
+/* midiRxByte --- state machine to deal with a single MIDI byte received from the UART */
+
+void MidiRxByte(const uint8_t ch)
+{
+   static uint8_t midiStatus = 0u;
+   static uint8_t midiChannel = 0u;
+   static uint8_t midiNoteNumber = 0u;
+   uint8_t midiVelocity = 0u;
+   uint8_t midiProgram = 0u;
+   static uint8_t midiControl = 0u;
+   uint8_t midiValue = 0u;
+   static uint8_t midiBendLo = 0u;
+   uint8_t midiBendHi = 0u;
+   static uint8_t midiByte = 0u;
+   
+   if (ch & 0x80) {              // It's a status byte
+      midiStatus = ch & 0xF0;
+      midiChannel = (ch & 0x0F) + 1;
+      midiByte = 1;
+      
+      // TODO: check for System Messages here
+   }
+   else {                        // It's a data byte
+      switch (midiByte) {
+      case 1:
+         if (midiStatus == MIDI_NOTE_ON || midiStatus == MIDI_NOTE_OFF) {
+            midiNoteNumber = ch;
+            midiByte++;
+         }
+         else if (midiStatus == MIDI_PROGRAM_CHANGE) {
+            midiProgram = ch;
+            midiByte = 1;
+            
+            MidiProgramChange(midiChannel, midiProgram);
+         }
+         else if (midiStatus == MIDI_CONTROL_CHANGE) {
+            midiControl = ch;
+            midiByte++;
+         }
+         else if (midiStatus == MIDI_PITCH_BEND) {
+            midiBendLo = ch;
+            midiByte++;
+         }
+         break;
+      case 2:
+         if (midiStatus == MIDI_NOTE_OFF) {
+            midiVelocity = ch;
+            midiByte = 1;
+            
+            MidiNoteOff(midiChannel, midiNoteNumber, midiVelocity);
+         }
+         else if (midiStatus == MIDI_NOTE_ON) {
+            midiVelocity = ch;
+            midiByte = 1;
+            
+            if (midiVelocity == 0)
+               MidiNoteOff(midiChannel, midiNoteNumber, midiVelocity);
+            else
+               MidiNoteOn(midiChannel, midiNoteNumber, midiVelocity);
+         }
+         else if (midiStatus == MIDI_CONTROL_CHANGE) {
+            midiValue = ch;
+            midiByte = 1;
+            
+            MidiControlChange(midiChannel, midiControl, midiValue);
+         }
+         else if (midiStatus == MIDI_PITCH_BEND) {
+            midiBendHi = ch;
+            midiByte = 1;
+            
+            MidiPitchBend(midiChannel, (midiBendHi * 128) + midiBendLo);
+         }
+         break;
+      }
+   }
+}
+
+
 /* printDeviceID --- print the Device ID bytes as read from SIGROW */
 
 void printDeviceID(void)
@@ -331,14 +492,14 @@ static void initGPIOs(void)
 
    PORTA.DIR = 0;
    PORTB.DIR = 0;
-   PORTC.DIR = LED | SQWAVE;           // For LED and 500Hz signal
+   PORTC.DIR = LED_PIN | SQWAVE_PIN | GATE_PIN | TRIGGER_PIN; // For LED, GATE, TRIGGER, and 500Hz signal
    PORTD.DIR = 0;
    PORTE.DIR = 0;
    PORTF.DIR = 0;
 
    PORTA.OUT = 0xFF;
    PORTB.OUT = 0xFF;
-   PORTC.OUT = 0xFF;
+   PORTC.OUT = 0xF0;
    PORTD.OUT = 0xFF;
    PORTE.OUT = 0xFF;
    PORTF.OUT = 0xFF;
@@ -437,17 +598,26 @@ int main(void)
    printDeviceID();
    printSerialNumber();
    
+   PORTC.OUTCLR = GATE_PIN;      // GATE signal LOW initially on PC4
+   PORTC.OUTCLR = TRIGGER_PIN;   // TRIGGER signal LOW initially on PC5
+   
    end = millis() + 500UL;
    
    while (1) {
       if (Tick) {
          if (millis() >= end) {
             end = millis() + 500UL;
-            PORTC.OUTTGL = LED;        // LED on PC3 toggle
+            PORTC.OUTTGL = LED_PIN;        // LED on PC3 toggle
 
             printf("millis() = %ld\n", millis());
          }
          
+         if (millis() >= TriggerOff) {
+            PORTC.OUTCLR = TRIGGER_PIN;   // TRIGGER signal LOW
+            TriggerOff = 0xffffffff;
+         }
+         
+         // TODO: Nudge watchdog here
          Tick = 0;
       }
       
@@ -478,7 +648,8 @@ int main(void)
       if (UART1RxAvailable()) {
          const uint8_t ch = UART1RxByte();
          
-         printf("UART1: %02x\n", ch);  // Just trace MIDI Rx for now
+         //printf("UART1: %02x\n", ch);
+         MidiRxByte(ch);
       }
    }
 }
