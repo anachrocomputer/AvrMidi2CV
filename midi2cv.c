@@ -14,6 +14,7 @@
 #define LED_PIN     PIN3_bm   // Blinking LED on PC3 (pin 4)
 #define GATE_PIN    PIN4_bm   // GATE signal on PC4 (pin 7)
 #define TRIGGER_PIN PIN5_bm   // TRIGGER signal on PC5 (pin 8)
+#define DAC_CS_PIN  PIN7_bm   // MCP4822 /CS pin on PA7 (pin 40)
 
 
 #define MIDI_NOTE_OFF           (0x80)
@@ -283,12 +284,42 @@ void UART1TxByte(const uint8_t data)
 }
 
 
+/* Spi0TxByte --- transmit a single byte on SPI0 */
+
+uint8_t Spi0TxByte(const uint8_t byte)
+{
+   SPI0.DATA = byte;
+   
+   while ((SPI0.INTFLAGS & SPI_IF_bm) == 0)
+      ;
+      
+   return (SPI0.DATA);
+   
+}
+
+
 /* MidiNoteOn --- handle a MIDI note on message */
 
 void MidiNoteOn(const int channel, const int note, const int velocity)
-{   
-   // TODO: set CV and velocity DACs here
+{
+   const uint16_t dacNoteCmd = 0x3000 | (note << 5);
    
+   PORTA.OUTCLR = DAC_CS_PIN; // MCP4822 /CS LOW
+   
+   Spi0TxByte(dacNoteCmd >> 8);
+   Spi0TxByte(dacNoteCmd & 0xff);
+   
+   PORTA.OUTSET = DAC_CS_PIN; // MCP4822 /CS HIGH
+   
+   const uint16_t dacVelocityCmd = 0xb000 | (velocity << 5);
+   
+   PORTA.OUTCLR = DAC_CS_PIN; // MCP4822 /CS LOW
+   
+   Spi0TxByte(dacVelocityCmd >> 8);
+   Spi0TxByte(dacVelocityCmd & 0xff);
+   
+   PORTA.OUTSET = DAC_CS_PIN; // MCP4822 /CS HIGH
+
    PORTC.OUTSET = GATE_PIN;      // GATE signal HIGH
    PORTC.OUTSET = TRIGGER_PIN;   // TRIGGER signal HIGH
    TriggerOff = millis() + 10;
@@ -567,7 +598,6 @@ void initSPI(void)
    SPI0.CTRLA = SPI_MASTER_bm; // SPI prescaler divide-by 4 gives 5MHz
    
    SPI0.CTRLB = SPI_SSD_bm | SPI_MODE1_bm | SPI_MODE0_bm;
-   SPI0.INTCTRL = SPI_IE_bm;
    SPI0.CTRLA |= SPI_ENABLE_bm;  // Enable SPI
    
    PORTA.DIRSET = PIN4_bm;    // Make sure PA4/MOSI (pin 37 on DIP-40) is an output
@@ -583,7 +613,7 @@ int main(void)
    initMCU();
    initGPIOs();
    initUARTs();
-   //initSPI();
+   initSPI();
    initMillisecondTimer();
    
    sei();   // Enable interrupts

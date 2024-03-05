@@ -1,9 +1,20 @@
 # AvrMidi2CV
 
 Simple MIDI to Control Voltage (CV) converter.
-Very much a work-in-progress at the moment,
-with a basic MIDI state machine and just a trace print of MIDI messages.
-SPI interface to MCP4822 DAC is not implemented yet.
+A work-in-progress at the moment,
+with a basic MIDI state machine and rudimentary CV and Velocity outputs
+via MCP4822 DAC.
+This DAC is a dual 12-bit SPI type,
+and is not really accurate enough for 1V-per-octave note control voltages.
+It's fine for Velocity and Modulation Wheel signals, though,
+and it's cheap and readily available in an 8-pin DIL package.
+There are only two analog output channels,
+but we really need several for MIDI messages such as Control Change.
+
+The microcontroller has plenty of spare GPIO pins which we can use
+to trigger analog rhythm sound generators.
+This facility is not yet implemented,
+but will be added later.
 
 Runs on ATmega4809. Code in C, compiled with GCC.
 
