@@ -668,6 +668,9 @@ int main(void)
          case 'R':
             printResetReason();
             break;
+         case '~':
+            _PROTECTED_WRITE(RSTCTRL.SWRR, RSTCTRL_SWRE_bm);
+            break;
          }
       }
       
