@@ -12,8 +12,9 @@ There are only two analog output channels,
 but we really need several for MIDI messages such as Control Change.
 
 The microcontroller has plenty of spare GPIO pins which we can use
-to trigger analog rhythm sound generators.
-This facility is not yet implemented,
+for on/off controls,
+and to trigger analog rhythm sound generators.
+This latter facility is not yet implemented,
 but will be added later.
 
 Runs on ATmega4809. Code in C, compiled with GCC.
@@ -29,6 +30,7 @@ Runs on ATmega4809. Code in C, compiled with GCC.
 | LED      | PC3      | 4                     |                   |
 | GATE     | PC4      | 7                     |                   |
 | TRIGGER  | PC5      | 8                     |                   |
+| SUSTAIN  | PD7      | 16                    |                   |
 | MOSI     | PA4/MOSI | 37                    | 4 (SDI)           |
 | MISO     | PA5/MISO | 38                    | n/c               |
 | SCK      | PA6/SCK  | 39                    | 3 (SCK)           |

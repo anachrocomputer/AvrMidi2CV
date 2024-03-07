@@ -15,6 +15,7 @@
 #define LED_PIN     PIN3_bm   // Blinking LED on PC3 (pin 4)
 #define GATE_PIN    PIN4_bm   // GATE signal on PC4 (pin 7)
 #define TRIGGER_PIN PIN5_bm   // TRIGGER signal on PC5 (pin 8)
+#define SUSTAIN_PIN PIN7_bm   // SUSTAIN signal on PD7 (pin 16)
 #define DAC_CS_PIN  PIN7_bm   // MCP4822 /CS pin on PA7 (pin 40)
 
 
@@ -44,6 +45,30 @@
 #define MIDI_ACTIVE_SENSING     (0x0E)
 #define MIDI_SYS_RESET          (0x0F)
 
+#define MIDI_CC_MODULATION      (1)
+#define MIDI_CC_PAN             (10)
+#define MIDI_CC_EXPRESSION      (11)
+#define MIDI_CC_SUSTAIN         (64)
+#define MIDI_CC_PORTAMENTO      (65)
+#define MIDI_CC_SOSTENUTO       (66)
+#define MIDI_CC_SOFT            (67)
+#define MIDI_CC_LEGATO          (68)
+#define MIDI_CC_HOLD2           (69)
+#define MIDI_CC_SOUNDCTRL1      (70)
+#define MIDI_CC_SOUNDCTRL2      (71)
+#define MIDI_CC_SOUNDCTRL3      (72)   // Release on my controller
+#define MIDI_CC_SOUNDCTRL4      (73)   // Attack on my controller
+#define MIDI_CC_SOUNDCTRL5      (74)   // Cut off on my controller
+#define MIDI_CC_SOUNDCTRL6      (75)   // Resonance on my controller
+#define MIDI_CC_SOUNDCTRL7      (76)
+#define MIDI_CC_SOUNDCTRL8      (77)
+#define MIDI_CC_SOUNDCTRL9      (78)
+#define MIDI_CC_SOUNDCTRL10     (79)
+#define MIDI_CC_EFFECT1         (91)   // Reverb on my controller
+#define MIDI_CC_EFFECT2         (92)
+#define MIDI_CC_EFFECT3         (93)   // Chorus on my controller
+#define MIDI_CC_EFFECT4         (94)
+#define MIDI_CC_EFFECT5         (95)
 
 #define BAUDRATE (9600UL)
 #define MIDIBAUD (31250UL)
@@ -351,9 +376,58 @@ void MidiProgramChange(const int channel, const int program)
 
 void MidiControlChange(const int channel, const int control, const int value)
 {
-   // TODO: set control DAC here
+   switch (control) {
+   case MIDI_CC_MODULATION:
+      printf("%d MOD: %d\n", channel, value);
+      break;
+   case MIDI_CC_PAN:
+      printf("%d PAN: %d\n", channel, value);
+      break;
+   case MIDI_CC_EXPRESSION:
+      printf("%d EXP: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL1:
+      printf("%d SC1: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL2:
+      printf("%d SC2: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL3:
+      printf("%d SC3: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL4:
+      printf("%d SC4: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL5:
+      printf("%d SC5: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL6:
+      printf("%d SC6: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL7:
+      printf("%d SC7: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL8:
+      printf("%d SC8: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL9:
+      printf("%d SC9: %d\n", channel, value);
+      break;
+   case MIDI_CC_SOUNDCTRL10:
+      printf("%d SC10: %d\n", channel, value);
+      break;
+   case MIDI_CC_SUSTAIN:
+      if (value > 63)
+         PORTD.OUTSET = SUSTAIN_PIN;
+      else
+         PORTD.OUTCLR = SUSTAIN_PIN;
+      break;
+   default:
+      printf("%d CC %d: %d\n", channel, control, value);
+      break;
+   }
    
-   printf("%d CC %d: %d\n", channel, control, value);
+   
 }
 
 
@@ -521,7 +595,7 @@ static void initGPIOs(void)
    PORTA.DIR = 0;
    PORTB.DIR = 0;
    PORTC.DIR = LED_PIN | SQWAVE_PIN | GATE_PIN | TRIGGER_PIN; // For LED, GATE, TRIGGER, and 500Hz signal
-   PORTD.DIR = 0;
+   PORTD.DIR = SUSTAIN_PIN;
    PORTE.DIR = 0;
    PORTF.DIR = 0;
 
@@ -628,6 +702,7 @@ int main(void)
    
    PORTC.OUTCLR = GATE_PIN;      // GATE signal LOW initially on PC4
    PORTC.OUTCLR = TRIGGER_PIN;   // TRIGGER signal LOW initially on PC5
+   PORTD.OUTCLR = SUSTAIN_PIN;   // SUSTAIN signal LOW initially on PD7
    
    end = millis() + 500UL;
    
