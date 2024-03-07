@@ -324,6 +324,43 @@ uint8_t Spi0TxByte(const uint8_t byte)
 }
 
 
+/* MidiSystemMessage --- handle MIDI system messages */
+
+void MidiSystemMessage(const int message)
+{
+   switch (message) {
+   case MIDI_SYS_EX:
+      break;
+   case MIDI_TIME_CODE:
+      break;
+   case MIDI_SONG_POSITION:
+      break;
+   case MIDI_SONG_SELECT:
+      break;
+   case MIDI_TUNE_REQUEST:
+      break;
+   case MIDI_SYS_EX_END:
+      break;
+   case MIDI_TIMING_CLOCK:
+      break;
+   case MIDI_START:
+      break;
+   case MIDI_CONTINUE:
+      break;
+   case MIDI_STOP:
+      break;
+   case MIDI_ACTIVE_SENSING:
+      /* Should we blink a LED here? */
+      break;
+   case MIDI_SYS_RESET:
+      break;
+   default:
+      printf("SYS %d\n", message);
+      break;
+   }
+}
+
+
 /* MidiNoteOn --- handle a MIDI note on message */
 
 void MidiNoteOn(const int channel, const int note, const int velocity)
@@ -461,7 +498,10 @@ void MidiRxByte(const uint8_t ch)
       midiChannel = (ch & 0x0F) + 1;
       midiByte = 1;
       
-      // TODO: check for System Messages here
+      if (midiStatus == MIDI_SYSTEM) {
+         MidiSystemMessage(ch & 0x0F);
+         midiByte = 0;
+      }
    }
    else {                        // It's a data byte
       switch (midiByte) {
