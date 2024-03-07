@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/wdt.h>
 
 // UART0 TxD on PA0 (default) pin 33
 // UART0 RxD on PA1 (default) pin 34
@@ -615,6 +616,7 @@ int main(void)
    initUARTs();
    initSPI();
    initMillisecondTimer();
+   wdt_enable(WDTO_2S);
    
    sei();   // Enable interrupts
    
@@ -643,7 +645,7 @@ int main(void)
             TriggerOff = 0xffffffff;
          }
          
-         // TODO: Nudge watchdog here
+         wdt_reset();
          Tick = 0;
       }
       
