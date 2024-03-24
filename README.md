@@ -2,14 +2,16 @@
 
 Simple MIDI to Control Voltage (CV) converter.
 A work-in-progress at the moment,
-with a basic MIDI state machine and rudimentary CV and Velocity outputs
-via MCP4822 DAC.
-This DAC is a dual 12-bit SPI type,
-and is not really accurate enough for 1V-per-octave note control voltages.
-It's fine for Velocity and Modulation Wheel signals, though,
-and it's cheap and readily available in an 8-pin DIL package.
-There are only two analog output channels,
-but we really need several for MIDI messages such as Control Change.
+with a basic MIDI state machine and CV, Velocity, and Pitch Bend
+outputs via AD5676 DAC.
+This DAC is an 8-channel 16-bit SPI type,
+and should be accurate enough for 1V-per-octave note control voltages.
+It's fine for Pitch Bend signals, too, which are 14-bit.
+But it's not cheap and only available in a 20-pin TSSOP package
+with 0.65mm pitch leads.
+Of the eight analog output channels, we're only using three so far.
+When we need lots more channels for MIDI messages such as Control Change
+we'll add a 12-channel 8-bit DAC, the AD8804 (also SPI).
 
 The microcontroller has plenty of spare GPIO pins which we can use
 for on/off controls,
@@ -21,24 +23,31 @@ Runs on ATmega4809. Code in C, compiled with GCC.
 
 ## Connections
 
-| Signal   | MCU Port | ATmega4809 DIP-40 pin | MCP4822 DIP-8 pin |
-|----------|----------|-----------------------|-------------------|
-| UPDI     | UPDI     | 30                    |                   |
-| MIDI_OUT | TxD1     | 1 (PC0)               |                   |
-| MIDI_IN  | RxD1     | 2 (PC1)               |                   |
-| SQWAVE   | PC2      | 3                     |                   |
-| LED      | PC3      | 4                     |                   |
-| GATE     | PC4      | 7                     |                   |
-| TRIGGER  | PC5      | 8                     |                   |
-| SUSTAIN  | PD7      | 16                    |                   |
-| MOSI     | PA4/MOSI | 37                    | 4 (SDI)           |
-| MISO     | PA5/MISO | 38                    | n/c               |
-| SCK      | PA6/SCK  | 39                    | 3 (SCK)           |
-| SS       | PA7/SS   | 40                    | 2 (/CS)           |
-| RxD      | RxD0     | 34 (PA1)              |                   |
-| TxD      | TxD0     | 33 (PA0)              |                   |
+| Signal    | MCU Port | ATmega4809 DIP-40 pin | AD5676 TSSOP-20 pin |
+|:----------|:---------|:----------------------|:--------------------|
+| UPDI      | UPDI     | 30                    |                     |
+| MIDI_OUT  | TxD1     | 1 (PC0)               |                     |
+| MIDI_IN   | RxD1     | 2 (PC1)               |                     |
+| SQWAVE    | PC2      | 3                     |                     |
+| LED       | PC3      | 4                     |                     |
+| GATE      | PC4      | 7                     |                     |
+| TRIGGER   | PC5      | 8                     |                     |
+| SUSTAIN   | PD7      | 16                    |                     |
+| MOSI      | PA4/MOSI | 37                    | 7 (SDI)             |
+| MISO      | PA5/MISO | 38                    | n/c                 |
+| SCK       | PA6/SCK  | 39                    | 6 (SCLK)            |
+| SS        | PA7/SS   | 40                    | 5 (/SYNC)           |
+| RxD       | RxD0     | 34 (PA1)              |                     |
+| TxD       | TxD0     | 33 (PA0)              |                     |
+| CV        |          |                       | 2 (Vout0)           |
+| VELOCITY  |          |                       | 1 (Vout1)           |
+| PITCHBEND |          |                       | 20 (Vout2)          |
 
 Power and ground pins not shown.
+
+CV must be amplified by a non-inverting op-amp circuit to achieve
+1V per octave over a useful range.
+I used an LM324 which gives the capacity for four CV signals.
 
 ## AVR Toolchain
 

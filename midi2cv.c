@@ -324,6 +324,22 @@ uint8_t Spi0TxByte(const uint8_t byte)
 }
 
 
+/* WriteAD5676 --- write a 16-bit word to one channel of the AD5676 SPI DAC */
+
+void WriteAD5676(const uint8_t channel, const uint16_t dac)
+{
+   const uint8_t cmd = 3 << 4;
+   
+   PORTA.OUTCLR = DAC_CS_PIN; // AD5676 /CS LOW
+   
+   Spi0TxByte(cmd | channel);
+   Spi0TxByte(dac >> 8);
+   Spi0TxByte(dac & 0xff);
+   
+   PORTA.OUTSET = DAC_CS_PIN; // AD5676 /CS HIGH
+}
+
+
 /* MidiSystemMessage --- handle MIDI system messages */
 
 void MidiSystemMessage(const int message)
@@ -365,23 +381,8 @@ void MidiSystemMessage(const int message)
 
 void MidiNoteOn(const int channel, const int note, const int velocity)
 {
-   const uint16_t dacNoteCmd = 0x3000 | (note << 5);
-   
-   PORTA.OUTCLR = DAC_CS_PIN; // MCP4822 /CS LOW
-   
-   Spi0TxByte(dacNoteCmd >> 8);
-   Spi0TxByte(dacNoteCmd & 0xff);
-   
-   PORTA.OUTSET = DAC_CS_PIN; // MCP4822 /CS HIGH
-   
-   const uint16_t dacVelocityCmd = 0xb000 | (velocity << 5);
-   
-   PORTA.OUTCLR = DAC_CS_PIN; // MCP4822 /CS LOW
-   
-   Spi0TxByte(dacVelocityCmd >> 8);
-   Spi0TxByte(dacVelocityCmd & 0xff);
-   
-   PORTA.OUTSET = DAC_CS_PIN; // MCP4822 /CS HIGH
+   WriteAD5676(0, note << 9);
+   WriteAD5676(1, velocity << 9);
 
    PORTC.OUTSET = GATE_PIN;      // GATE signal HIGH
    PORTC.OUTSET = TRIGGER_PIN;   // TRIGGER signal HIGH
@@ -472,7 +473,7 @@ void MidiControlChange(const int channel, const int control, const int value)
 
 void MidiPitchBend(const int channel, const int bend)
 {
-   // TODO: set pitch bend DAC here
+   WriteAD5676(2, bend << 2);
    
    printf("%d PB %d\n", channel, bend);
 }
@@ -710,9 +711,9 @@ static void initMillisecondTimer(void)
 
 void initSPI(void)
 {
-   SPI0.CTRLA = SPI_MASTER_bm; // SPI prescaler divide-by 4 gives 5MHz
+   SPI0.CTRLA = SPI_MASTER_bm | SPI_PRESC0_bm; // SPI prescaler divide-by-16 gives ~1.3MHz
    
-   SPI0.CTRLB = SPI_SSD_bm | SPI_MODE1_bm | SPI_MODE0_bm;
+   SPI0.CTRLB = SPI_SSD_bm | SPI_MODE1_bm; // SPI Mode 2, clock on falling edge
    SPI0.CTRLA |= SPI_ENABLE_bm;  // Enable SPI
    
    PORTA.DIRSET = PIN4_bm;    // Make sure PA4/MOSI (pin 37 on DIP-40) is an output
