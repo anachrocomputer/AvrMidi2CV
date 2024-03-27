@@ -11,12 +11,13 @@
 // UART0 RxD on PA1 (default) pin 34
 // UART1 TxD on PC0 (default) pin 1
 // UART1 RxD on PC1 (default) pin 2
-#define SQWAVE_PIN  PIN2_bm   // 500Hz square wave on PC2 (pin 3)
-#define LED_PIN     PIN3_bm   // Blinking LED on PC3 (pin 4)
-#define GATE_PIN    PIN4_bm   // GATE signal on PC4 (pin 7)
-#define TRIGGER_PIN PIN5_bm   // TRIGGER signal on PC5 (pin 8)
-#define SUSTAIN_PIN PIN7_bm   // SUSTAIN signal on PD7 (pin 16)
-#define DAC_CS_PIN  PIN7_bm   // MCP4822 /CS pin on PA7 (pin 40)
+#define SQWAVE_PIN    PIN2_bm   // 500Hz square wave on PC2 (pin 3)
+#define LED_PIN       PIN3_bm   // Blinking LED on PC3 (pin 4)
+#define GATE_PIN      PIN4_bm   // GATE signal on PC4 (pin 7)
+#define TRIGGER_PIN   PIN5_bm   // TRIGGER signal on PC5 (pin 8)
+#define SUSTAIN_PIN   PIN7_bm   // SUSTAIN signal on PD7 (pin 16)
+#define DAC16_CS_PIN  PIN7_bm   // AD5676 /CS pin on PA7 (pin 40)
+#define DAC8_CS_PIN   PIN3_bm   // AD8804 /CS pin on PA3 (pin 36)
 
 
 #define MIDI_NOTE_OFF           (0x80)
@@ -310,6 +311,31 @@ void UART1TxByte(const uint8_t data)
 }
 
 
+/* SpiMode --- set SPI mode: clock phase and polarity */
+
+void SpiMode(const int mode)
+{
+   SPI0.CTRLA &= ~SPI_ENABLE_bm; // Disable SPI
+   
+   switch (mode) {
+   case 0:
+      SPI0.CTRLB = SPI_SSD_bm; // Clock LOW when idle, rising edge active
+      break;
+   case 1:
+      SPI0.CTRLB = SPI_SSD_bm | SPI_MODE0_bm; // Clock LOW when idle, falling edge active
+      break;
+   case 2:
+      SPI0.CTRLB = SPI_SSD_bm | SPI_MODE1_bm; // Clock HIGH when idle, falling edge active
+      break;
+   case 3:
+      SPI0.CTRLB = SPI_SSD_bm | SPI_MODE1_bm | SPI_MODE0_bm; // Clock HIGH when idle, rising edge active
+      break;
+   }
+   
+   SPI0.CTRLA |= SPI_ENABLE_bm;  // Enable SPI
+}
+
+
 /* Spi0TxByte --- transmit a single byte on SPI0 */
 
 uint8_t Spi0TxByte(const uint8_t byte)
@@ -330,13 +356,30 @@ void WriteAD5676(const uint8_t channel, const uint16_t dac)
 {
    const uint8_t cmd = 3 << 4;
    
-   PORTA.OUTCLR = DAC_CS_PIN; // AD5676 /CS LOW
+   SpiMode(2);
+   
+   PORTA.OUTCLR = DAC16_CS_PIN; // AD5676 /CS LOW
    
    Spi0TxByte(cmd | channel);
    Spi0TxByte(dac >> 8);
    Spi0TxByte(dac & 0xff);
    
-   PORTA.OUTSET = DAC_CS_PIN; // AD5676 /CS HIGH
+   PORTA.OUTSET = DAC16_CS_PIN; // AD5676 /CS HIGH
+}
+
+
+/* WriteAD8804 --- write an 8-bit word to one channel of the AD8804 SPI DAC */
+
+void WriteAD8804(const uint8_t channel, const uint8_t dac)
+{
+   SpiMode(3);
+   
+   PORTA.OUTCLR = DAC8_CS_PIN; // AD8804 /CS LOW
+   
+   Spi0TxByte(channel);
+   Spi0TxByte(dac);
+   
+   PORTA.OUTSET = DAC8_CS_PIN; // AD8804 /CS HIGH
 }
 
 
@@ -416,9 +459,11 @@ void MidiControlChange(const int channel, const int control, const int value)
 {
    switch (control) {
    case MIDI_CC_MODULATION:
+      WriteAD8804(0, value << 1);
       printf("%d MOD: %d\n", channel, value);
       break;
    case MIDI_CC_PAN:
+      WriteAD8804(1, value << 1);
       printf("%d PAN: %d\n", channel, value);
       break;
    case MIDI_CC_EXPRESSION:
@@ -711,7 +756,7 @@ static void initMillisecondTimer(void)
 
 void initSPI(void)
 {
-   SPI0.CTRLA = SPI_MASTER_bm | SPI_PRESC0_bm; // SPI prescaler divide-by-16 gives ~1.3MHz
+   SPI0.CTRLA = SPI_MASTER_bm | SPI_PRESC0_bm; // SPI prescaler divide-by-16 gives 1.25MHz
    
    SPI0.CTRLB = SPI_SSD_bm | SPI_MODE1_bm; // SPI Mode 2, clock on falling edge
    SPI0.CTRLA |= SPI_ENABLE_bm;  // Enable SPI
@@ -719,6 +764,10 @@ void initSPI(void)
    PORTA.DIRSET = PIN4_bm;    // Make sure PA4/MOSI (pin 37 on DIP-40) is an output
    PORTA.DIRSET = PIN6_bm;    // Make sure PA6/SCK (pin 39 on DIP-40) is an output
    PORTA.DIRSET = PIN7_bm;    // Make sure PA7/SS (pin 40 on DIP-40) is an output
+   PORTA.DIRSET = PIN3_bm;    // Make sure PA3/CS (pin 36 on DIP-40) is an output
+   
+   PORTA.OUTSET = DAC16_CS_PIN; // AD5676 /CS HIGH
+   PORTA.OUTSET = DAC8_CS_PIN;  // AD8804 /CS HIGH
 }
 
 
